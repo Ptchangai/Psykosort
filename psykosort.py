@@ -1,21 +1,25 @@
 import os
 import shutil
-
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
 import numpy as np
 import pickle
+import cv2
 
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
-#import easyocr
 import pytesseract
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+
+
+nltk.download("punkt")
+nltk.download("stopwords")
+
 
 cnn_model = None
 ocr_model = None
@@ -23,7 +27,6 @@ cnn_lb = None
 text_vectorizer = None
 text_encoder = None
 
-#reader = easyocr.Reader(['en', 'fr'], gpu=False)
 stop_words = set(stopwords.words('english')).union(stopwords.words('french'))
 
 if os.path.exists("classifier.h5") and os.path.exists("label_binarizer.pkl"):
@@ -31,19 +34,22 @@ if os.path.exists("classifier.h5") and os.path.exists("label_binarizer.pkl"):
     with open("label_binarizer.pkl", "rb") as f:
         cnn_lb = pickle.load(f)
 
+ocr_available = False
 if os.path.exists("text_classifier_model.h5") and os.path.exists("tfidf_vectorizer.pkl") and os.path.exists("text_label_encoder.pkl"):
     ocr_model = load_model("text_classifier_model.h5")
     with open("tfidf_vectorizer.pkl", "rb") as f:
         text_vectorizer = pickle.load(f)
     with open("text_label_encoder.pkl", "rb") as f:
         text_encoder = pickle.load(f)
+    ocr_available = True
+
 
 def predict_cnn(image_path):
     if not cnn_model or not cnn_lb:
         return {}
     try:
         img = load_img(image_path, target_size=(224, 224))
-        arr = img_to_array(img)# / 255.0
+        arr = img_to_array(img)
         arr = preprocess_input(arr)
         arr = np.expand_dims(arr, axis=0)
         preds = cnn_model.predict(arr)[0]
@@ -51,8 +57,9 @@ def predict_cnn(image_path):
     except:
         return {}
 
+
 def predict_ocr(image_path):
-    if not ocr_model or not text_vectorizer or not text_encoder:
+    if not ocr_available:
         return {}
     try:
         img = cv2.imread(image_path)
@@ -69,12 +76,15 @@ def predict_ocr(image_path):
         return {}
 
 def combine_predictions(pred1, pred2):
+    if not pred2:  # No OCR prediction
+        return sorted(pred1.items(), key=lambda x: x[1], reverse=True)[:3]
+
     all_keys = set(pred1.keys()).union(set(pred2.keys()))
     combined = {}
     for k in all_keys:
         combined[k] = pred1.get(k, 0) * 0.5 + pred2.get(k, 0) * 0.5
-    sorted_preds = sorted(combined.items(), key=lambda x: x[1], reverse=True)
-    return sorted_preds[:3]
+    return sorted(combined.items(), key=lambda x: x[1], reverse=True)[:3]
+
 
 class ImageSorterGUI:
     def __init__(self, master):
@@ -114,7 +124,8 @@ class ImageSorterGUI:
             self.label.config(text=f"Processed {i+1}/{len(raw_files)}")
             self.master.update()
 
-        self.label.config(text="Inference complete. Begin sorting!")
+        method = "CNN + OCR" if ocr_available else "CNN only"
+        self.label.config(text=f"Inference complete using {method}. Begin sorting.")
         self.current_index = 0
         self.next_image()
 
@@ -171,8 +182,6 @@ class ImageSorterGUI:
         self.next_image()
 
 if __name__ == "__main__":
-    nltk.download("punkt")
-    nltk.download("stopwords")
     root = tk.Tk()
     root.title("Psykosort - Smart Image Sorter")
     app = ImageSorterGUI(root)
