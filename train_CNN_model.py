@@ -38,59 +38,65 @@ def build_model(num_classes, img_size=(224, 224, 3)):
     return model
 
 
-root_folder = "/media/piu/Elements/Images/Random/Argue/"
-data = collect_images_by_top_folder(root_folder, ignore_folders={}) #ignore_folders={"Site", "Sites"})
+def train_model(root_folder, ignore_folders):
+    data = collect_images_by_top_folder(root_folder, ignore_folders=ignore_folders) 
 
-df, lb = build_classification_dataframe(data)
+    df, lb = build_classification_dataframe(data)
 
-with open("label_binarizer.pkl", "wb") as f:
-    pickle.dump(lb, f)
+    with open("label_binarizer.pkl", "wb") as f:
+        pickle.dump(lb, f)
 
-df_train, df_val = train_test_split(df, test_size=0.1, random_state=42)
-train_gen = SingleLabelImageGenerator(df_train, lb, img_size=(224, 224))
-val_gen = SingleLabelImageGenerator(df_val, lb, img_size=(224, 224))
+    df_train, df_val = train_test_split(df, test_size=0.1, random_state=42)
+    train_gen = SingleLabelImageGenerator(df_train, lb, img_size=(224, 224))
+    val_gen = SingleLabelImageGenerator(df_val, lb, img_size=(224, 224))
 
-class_weights = compute_class_weight(class_weight='balanced', classes=lb.classes_, y=df_train['label'])
-class_weight_dict = {i: w for i, w in enumerate(class_weights)}
+    class_weights = compute_class_weight(class_weight='balanced', classes=lb.classes_, y=df_train['label'])
+    class_weight_dict = {i: w for i, w in enumerate(class_weights)}
 
-model = build_model(num_classes=len(lb.classes_))
+    model = build_model(num_classes=len(lb.classes_))
 
-reduce_lr = ReduceLROnPlateau(
-    monitor='val_loss',
-    factor=0.5,
-    patience=8,
-    min_lr=1e-7,
-    verbose=1
-)
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=8,
+        min_lr=1e-7,
+        verbose=1
+    )
 
-early_stopping = EarlyStopping(
-    monitor='val_loss',
-    patience=20,
-    restore_best_weights=True,
-    verbose=1
-)
+    early_stopping = EarlyStopping(
+        monitor='val_loss',
+        patience=20,
+        restore_best_weights=True,
+        verbose=1
+    )
 
-history = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=60,
-    class_weight=class_weight_dict,
-    callbacks=[reduce_lr, early_stopping]
-)
+    history = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=60,
+        class_weight=class_weight_dict,
+        callbacks=[reduce_lr, early_stopping]
+    )
 
-model.save("classifier.h5")
+    model.save("classifier.h5")
 
-plt.figure(figsize=(9, 5))
-plt.plot(history.history['accuracy'], label='Training accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation accuracy')
-plt.title('Model accuracy over epochs')
-plt.xlabel('Epoch')
-plt.ylabel('Accuracy')
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.savefig('ANN_training_accuracy_plot.png')
-plt.show()
+    plt.figure(figsize=(9, 5))
+    plt.plot(history.history['accuracy'], label='Training accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation accuracy')
+    plt.title('Model accuracy over epochs')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig('CNN_training_accuracy_plot.png')
+    plt.show()
 
-final_val_acc = history.history['val_accuracy'][-1]
-print(f"Final validation accuracy: {final_val_acc:.4f}")
+    final_val_acc = history.history['val_accuracy'][-1]
+    print(f"Final validation accuracy: {final_val_acc:.4f}")
+
+
+if __name__ == "__main__":
+    root_folder = "path/to/input/folder"
+    ignore_folders = {"Site", "Sites"}
+    train_model(root_folder, ignore_folders)
