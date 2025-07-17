@@ -24,12 +24,6 @@ def build_model(num_classes, img_size=(224, 224, 3)):
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(128, activation='relu')(x)
-    x = Dropout(0.25)(x)
-    x = Dense(64, activation='relu')(x)
-    x = Dropout(0.25)(x)
-    x = Dense(32, activation='relu')(x)
-    x = Dropout(0.25)(x)
 
     output = Dense(num_classes, activation='softmax')(x)
 
