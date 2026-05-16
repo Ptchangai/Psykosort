@@ -17,7 +17,7 @@ Description of the scripts in this repository:
 | `train_OCR_model.py` | Train a text classification model (TF-IDF + Dense layers) using OCR-detected text from images. |
 | `auto_sort_CNN.py` | Non-interactive inference pipeline to sort images to their predicted subfolder using a CNN model. |
 | `psykosort.py` | Interactive GUI tool to review CNN and OCR predictions, and manually sort images into suggested folders using keyboard shortcuts. |
-
+| `clustering.py` | File sorter based on PCA and KMeans. |
 ---
 
 ## Planned
@@ -26,7 +26,7 @@ Description of the scripts in this repository:
 - [ ] Support multi-label classification.
 - [ ] Improve OCR models.
 - [ ] Export training logs and visualizations.
-- [ ] Ad option to load custom model into GUI.
+- [ ] Add option to load custom model into GUI.
 - [ ] Add option to train models directly from the GUI.
 
 ---
