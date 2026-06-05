@@ -29,17 +29,17 @@ text_encoder = None
 
 stop_words = set(stopwords.words('english')).union(stopwords.words('french'))
 
-if os.path.exists("classifier.h5") and os.path.exists("label_binarizer.pkl"):
-    cnn_model = load_model("classifier.h5")
-    with open("label_binarizer.pkl", "rb") as f:
+if os.path.exists(cnn_model) and os.path.exists(cnn_lb):
+    cnn_model = load_model(cnn_model)
+    with open(cnn_lb, "rb") as f:
         cnn_lb = pickle.load(f)
 
 ocr_available = False
-if os.path.exists("text_classifier_model.h5") and os.path.exists("tfidf_vectorizer.pkl") and os.path.exists("text_label_encoder.pkl"):
-    ocr_model = load_model("text_classifier_model.h5")
-    with open("tfidf_vectorizer.pkl", "rb") as f:
+if os.path.exists(ocr_model) and os.path.exists(text_vectorizer) and os.path.exists(text_encoder):
+    ocr_model = load_model(ocr_model)
+    with open(text_vectorizer, "rb") as f:
         text_vectorizer = pickle.load(f)
-    with open("text_label_encoder.pkl", "rb") as f:
+    with open(text_encoder, "rb") as f:
         text_encoder = pickle.load(f)
     ocr_available = True
 
