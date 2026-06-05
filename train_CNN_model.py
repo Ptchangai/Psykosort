@@ -14,7 +14,12 @@ from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import warnings
 
+warnings.filterwarnings(
+    "ignore", 
+    message="Palette images with Transparency expressed in bytes"
+)
 print("TensorFlow version:", tf.__version__)
 print("GPUs available:", tf.config.list_physical_devices('GPU'))
 

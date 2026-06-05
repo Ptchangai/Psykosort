@@ -170,14 +170,10 @@ class ImageSorterGUI:
             target_folder = os.path.join(self.folder, "temporary", suggestions[choice_idx])
             os.makedirs(target_folder, exist_ok=True)
             shutil.move(path, os.path.join(target_folder, os.path.basename(path)))
-            print(f"Moved to {target_folder}")
-        else:
-            print("No valid suggestion.")
         self.current_index += 1
         self.next_image()
 
     def skip_image(self):
-        print("Skipped.")
         self.current_index += 1
         self.next_image()
 
