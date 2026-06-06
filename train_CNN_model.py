@@ -15,11 +15,14 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import warnings
+from datetime import datetime
 
 warnings.filterwarnings(
     "ignore", 
     message="Palette images with Transparency expressed in bytes"
 )
+
+today = datetime.now().strftime("%y%m%d")
 print("TensorFlow version:", tf.__version__)
 print("GPUs available:", tf.config.list_physical_devices('GPU'))
 
@@ -42,7 +45,7 @@ def train_model(root_folder, ignore_folders):
 
     df, lb = build_classification_dataframe(data)
 
-    with open("label_binarizer.pkl", "wb") as f:
+    with open(today+"_label_binarizer.pkl", "wb") as f:
         pickle.dump(lb, f)
 
     df_train, df_val = train_test_split(df, test_size=0.1, random_state=42)
@@ -85,7 +88,7 @@ def train_model(root_folder, ignore_folders):
         callbacks=[reduce_lr, early_stopping, checkpoint]
     )
 
-    model.save("classifier.h5")
+    model.save(today+"_classifier.h5")
 
     plt.figure(figsize=(9, 5))
     plt.plot(history.history['accuracy'], label='Training accuracy')
@@ -96,7 +99,7 @@ def train_model(root_folder, ignore_folders):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('CNN_training_accuracy_plot.png')
+    plt.savefig(today+'CNN_training_accuracy_plot.png')
     plt.show()
 
     final_val_acc = history.history['val_accuracy'][-1]
