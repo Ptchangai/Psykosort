@@ -8,7 +8,7 @@ import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
@@ -69,12 +69,20 @@ def train_model(root_folder, ignore_folders):
         verbose=1
     )
 
+    checkpoint = ModelCheckpoint(
+        filepath="best_classifier.keras",
+        monitor='val_accuracy',
+        mode='max',
+        save_best_only=True,
+        verbose=1
+    )
+
     history = model.fit(
         train_gen,
         validation_data=val_gen,
         epochs=60,
         class_weight=class_weight_dict,
-        callbacks=[reduce_lr, early_stopping]
+        callbacks=[reduce_lr, early_stopping, checkpoint]
     )
 
     model.save("classifier.h5")
