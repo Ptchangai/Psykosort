@@ -40,7 +40,7 @@ def build_model(num_classes, img_size=(224, 224, 3)):
     return model
 
 
-def train_model(root_folder, ignore_folders):
+def train_model(root_folder, ignore_folders, finetune=False):
     data = collect_images_by_top_folder(root_folder, ignore_folders=ignore_folders) 
 
     df, lb = build_classification_dataframe(data)
@@ -55,7 +55,17 @@ def train_model(root_folder, ignore_folders):
     class_weights = compute_class_weight(class_weight='balanced', classes=lb.classes_, y=df_train['label'])
     class_weight_dict = {i: w for i, w in enumerate(class_weights)}
 
-    model = build_model(num_classes=len(lb.classes_))
+    if finetune:
+        model = tf.keras.models.load_model("best_classifier.keras")
+        model.layers[1].trainable = True
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+            loss='categorical_crossentropy',
+            metrics=['accuracy']
+        )
+    else:
+        model = build_model(num_classes=len(lb.classes_))
 
     reduce_lr = ReduceLROnPlateau(
         monitor='val_loss',
@@ -109,4 +119,5 @@ def train_model(root_folder, ignore_folders):
 if __name__ == "__main__":
     root_folder = "path/to/input/folder"
     ignore_folders = {"Site", "Sites"}
-    train_model(root_folder, ignore_folders)
+    finetune = False
+    train_model(root_folder, ignore_folders, finetune=finetune)
