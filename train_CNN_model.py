@@ -40,12 +40,12 @@ def build_model(num_classes, img_size=(224, 224, 3)):
     return model
 
 
-def train_model(root_folder, ignore_folders, finetune=False):
+def train_model(root_folder, ignore_folders, model_name="", finetune=False):
     data = collect_images_by_top_folder(root_folder, ignore_folders=ignore_folders) 
 
     df, lb = build_classification_dataframe(data)
 
-    with open(today+"_label_binarizer.pkl", "wb") as f:
+    with open(model_name+today+"_label_binarizer.pkl", "wb") as f:
         pickle.dump(lb, f)
 
     df_train, df_val = train_test_split(df, test_size=0.1, random_state=42)
@@ -56,7 +56,7 @@ def train_model(root_folder, ignore_folders, finetune=False):
     class_weight_dict = {i: w for i, w in enumerate(class_weights)}
 
     if finetune:
-        model = tf.keras.models.load_model("best_classifier.keras")
+        model = tf.keras.models.load_model(model_name+"best_classifier.keras")
         model.layers[1].trainable = True
 
         model.compile(
@@ -83,7 +83,7 @@ def train_model(root_folder, ignore_folders, finetune=False):
     )
 
     checkpoint = ModelCheckpoint(
-        filepath="best_classifier.keras",
+        filepath=model_name+"best_classifier.keras",
         monitor='val_accuracy',
         mode='max',
         save_best_only=True,
@@ -98,7 +98,7 @@ def train_model(root_folder, ignore_folders, finetune=False):
         callbacks=[reduce_lr, early_stopping, checkpoint]
     )
 
-    model.save(today+"_classifier.h5")
+    model.save(model_name+today+"classifier.h5")
 
     plt.figure(figsize=(9, 5))
     plt.plot(history.history['accuracy'], label='Training accuracy')
@@ -109,7 +109,7 @@ def train_model(root_folder, ignore_folders, finetune=False):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(today+'CNN_training_accuracy_plot.png')
+    plt.savefig(model_name+today+'CNN_training_accuracy_plot.png')
     plt.show()
 
     final_val_acc = history.history['val_accuracy'][-1]
@@ -120,4 +120,6 @@ if __name__ == "__main__":
     root_folder = "path/to/input/folder"
     ignore_folders = {"Site", "Sites"}
     finetune = False
-    train_model(root_folder, ignore_folders, finetune=finetune)
+    model_name = ""
+    train_model(root_folder, ignore_folders, model_name, finetune)
+    
