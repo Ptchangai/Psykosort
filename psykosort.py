@@ -6,6 +6,8 @@ from PIL import Image, ImageTk
 import numpy as np
 import pickle
 import cv2
+import threading
+import queue
 
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
@@ -30,7 +32,7 @@ text_encoder = None
 stop_words = set(stopwords.words('english')).union(stopwords.words('french'))
 
 if os.path.exists(cnn_model) and os.path.exists(cnn_lb):
-    cnn_model = load_model(cnn_model)
+    cnn_model = load_model(cnn_model, compile=False)
     with open(cnn_lb, "rb") as f:
         cnn_lb = pickle.load(f)
 
@@ -41,12 +43,11 @@ if os.path.exists(ocr_model) and os.path.exists(text_vectorizer) and os.path.exi
         text_vectorizer = pickle.load(f)
     with open(text_encoder, "rb") as f:
         text_encoder = pickle.load(f)
+    print("Using OCR model along with CNN model.")
     ocr_available = True
 
 
 def predict_cnn(image_path):
-    if not cnn_model or not cnn_lb:
-        return {}
     try:
         img = load_img(image_path, target_size=(224, 224))
         arr = img_to_array(img)
@@ -59,8 +60,6 @@ def predict_cnn(image_path):
 
 
 def predict_ocr(image_path):
-    if not ocr_available:
-        return {}
     try:
         img = cv2.imread(image_path)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -76,29 +75,23 @@ def predict_ocr(image_path):
         return {}
 
 def combine_predictions(pred1, pred2):
-    if not pred2:  # No OCR prediction
-        return sorted(pred1.items(), key=lambda x: x[1], reverse=True)[:3]
-
-    all_keys = set(pred1.keys()).union(set(pred2.keys()))
-    combined = {}
-    for k in all_keys:
-        combined[k] = pred1.get(k, 0) * 0.5 + pred2.get(k, 0) * 0.5
+    all_keys = set(pred1.keys()).union(pred2.keys())
+    combined = {k: pred1.get(k, 0)*0.5 + pred2.get(k, 0)*0.5 for k in all_keys}
     return sorted(combined.items(), key=lambda x: x[1], reverse=True)[:3]
-
 
 class ImageSorterGUI:
     def __init__(self, master):
         self.master = master
+        self.folder = ""
+        self.image_paths = []
         self.image_predictions = []
         self.current_index = 0
-        self.folder = ""
+        self.queue = queue.Queue()
 
-        self.label = tk.Label(master, text="Choose a folder to begin", font=("Arial", 14))
+        self.label = tk.Label(master, text="Choose a folder to begin", font=("Arial", 20))
         self.label.pack()
-
         self.canvas = tk.Canvas(master, width=600, height=600)
         self.canvas.pack()
-
         self.button = tk.Button(master, text="Choose Folder", command=self.choose_folder)
         self.button.pack()
 
@@ -109,36 +102,44 @@ class ImageSorterGUI:
 
     def choose_folder(self):
         self.folder = filedialog.askdirectory()
-        raw_files = self.collect_images(self.folder)
-        self.label.config(text=f"Running inference on {len(raw_files)} files...")
-        self.master.update()
-
-        self.image_predictions = []
-        for i, file_path in enumerate(raw_files):
-            pred1 = predict_cnn(file_path)
-            pred2 = predict_ocr(file_path)
-            combined = combine_predictions(pred1, pred2)
-            suggestions = [x[0] for x in combined]
-            self.image_predictions.append((file_path, suggestions))
-
-            self.label.config(text=f"Processed {i+1}/{len(raw_files)}")
-            self.master.update()
-
-        method = "CNN + OCR" if ocr_available else "CNN only"
-        self.label.config(text=f"Inference complete using {method}. Begin sorting.")
+        self.image_paths = self.collect_images(self.folder)
+        self.image_predictions.clear()
         self.current_index = 0
-        self.next_image()
+        self.label.config(text=f"Found {len(self.image_paths)} images. Processing...")
+        threading.Thread(target=self.run_inference, daemon=True).start()
+        self.master.after(100, self.check_queue)
 
     def collect_images(self, folder):
-        files = []
-        for root, _, filenames in os.walk(folder):
-            parts = os.path.normpath(root).split(os.sep)
-            if any(x.lower() in {"site", "sites", "temporary"} for x in parts):
+        paths = []
+        for root, _, files in os.walk(folder):
+            if "temporary" in root.lower():
                 continue
-            for f in filenames:
+            for f in files:
                 if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                    files.append(os.path.join(root, f))
-        return sorted(files)
+                    paths.append(os.path.join(root, f))
+        return sorted(paths)
+
+    def run_inference(self):
+        for i, path in enumerate(self.image_paths):
+            pred1 = predict_cnn(path)
+            pred2 = predict_ocr(path) if ocr_available else {}
+            combined = combine_predictions(pred1, pred2)
+            suggestions = [x[0] for x in combined]
+            self.queue.put((path, suggestions))
+
+    def check_queue(self):
+        try:
+            while True:
+                item = self.queue.get_nowait()
+                self.image_predictions.append(item)
+                if len(self.image_predictions) == 1:
+                    self.next_image()
+        except queue.Empty:
+            pass
+        if self.current_index >= len(self.image_paths):
+            self.label.config(text="Done sorting all files.")
+        else:
+            self.master.after(100, self.check_queue)
 
     def next_image(self):
         if self.current_index >= len(self.image_predictions):
@@ -149,14 +150,14 @@ class ImageSorterGUI:
         path, suggestions = self.image_predictions[self.current_index]
         self.label.config(
             text=f"{self.current_index+1}/{len(self.image_predictions)} | Suggestions: " +
-            f"1) {suggestions[0] if len(suggestions) > 0 else '-'}  " +
-            f"2) {suggestions[1] if len(suggestions) > 1 else '-'}  " +
-            f"3) {suggestions[2] if len(suggestions) > 2 else '-'}  | Press 4 to skip"
+                 f"1) {suggestions[0] if len(suggestions) > 0 else '-'}  " +
+                 f"2) {suggestions[1] if len(suggestions) > 1 else '-'}  " +
+                 f"3) {suggestions[2] if len(suggestions) > 2 else '-'}  | Press 4 to skip"
         )
 
         try:
             img = Image.open(path).convert("RGB")
-            img = img.resize((600, 600), Image.ANTIALIAS)
+            img = img.resize((600, 600), Image.Resampling.LANCZOS)
             self.tk_img = ImageTk.PhotoImage(img)
             self.canvas.delete("all")
             self.canvas.create_image(300, 300, image=self.tk_img)
